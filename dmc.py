@@ -31,9 +31,9 @@ class DiffusionMonteCarlo:
     self.dt = dt
     self.alpha = alpha
 
-    self.flags = np.zeros(self.Nmax, dtype=int) # 0 = dead, 1 = alive, 2 = newly made replica
+    self.flags = np.zeros(self.Nmax, dtype=int) # Three integer types: 0 = dead, 1 = alive, 2 = newly made replica
     for i in range(self.N):
-      self.flags[i] = 1 # Set the flags of our initial replicas to "alive"
+      self.flags[i] = 1 # Set the flags of initial replicas to "alive"
     self.points = np.zeros((self.Nmax, self.dn)) # (Initial) positions of replicas, shape: (Nmax, dn)
     self.E1 = self.averagePotentialEnergy() # Reference energy (1)
     self.E2 = self.E1 # Reference energy (2)
@@ -42,9 +42,10 @@ class DiffusionMonteCarlo:
 
   def U(self, x):
     """
-    U: potential energy (for a replica)
+    U: potential energy (for a single replica)
 
     x: array shape (d), position of replica
+
     returns: float, energy of the replica
     """
     pot = 0.5 * np.linalg.norm(x)**2
@@ -86,7 +87,7 @@ class DiffusionMonteCarlo:
   def replicateSingleReplica(self, i):
     """
     replicate point i into next available point, update flags by 2 to not loop over new replica
-    i: index of i
+    i: index of point[i]
 
     returns nothing
     """
@@ -114,16 +115,15 @@ class DiffusionMonteCarlo:
           pass
         elif m == 2: # Replicate once
           self.replicateSingleReplica(i)
-        else: # Replicate twice, for m >= 3
+        else: # Replicate twice if m >= 3
           self.replicateSingleReplica(i)
           self.replicateSingleReplica(i)
     
     for i in range(self.Nmax):
-        if self.flags[i] == 2:
-            self.flags[i] = 1
+      if self.flags[i] == 2:
+        self.flags[i] = 1
 
     self.E1 = self.E2
-    assert self.N > 0
     self.E2 = self.E1 + self.alpha*(1.0 - self.N / self.N0)
 
   def bucketNumber(self, x):
@@ -161,9 +161,9 @@ class DiffusionMonteCarlo:
     returns nothing
     """
     avg_energy = np.average(np.array(self.energy_storage))
-    print("Average Reference Energy: ", avg_energy)
-    print("Analytic Reference Energy: 0.5")
-    print("Percent Difference: \t\t{}%".format(np.abs(0.5 - avg_energy)/0.5*100))
+    print("Average Reference Energy: {}".format(avg_energy))
+    print("Analytic Energy:\t\t  0.5") # Exact energy for the 1D ground state harmonic oscillator in dimensionless units
+    print("Percent Difference:\t\t  {:.2f}%".format(np.abs(0.5 - avg_energy)/0.5*100))
 
     ax = plt.gca()
 
@@ -174,9 +174,11 @@ class DiffusionMonteCarlo:
     ax.tick_params(which='both', bottom=True, top=True, left=True, right=True)
 
     plt.rcParams["figure.figsize"] = [10.00, 7.00]
-    plt.title('Reference Energy Change at Each Time Step')
+    plt.rcParams.update({'font.size': 14})
+
+    plt.title('Reference Energy Per Time Step')
     plt.xlabel('Time step (dimensionless)')
-    plt.ylabel('$E_{Reference}$')
+    plt.ylabel('<$E_{R}$>')
     x = [i for i in range(len(self.energy_storage))]
     plt.plot(x, self.energy_storage)
     plt.show()
@@ -202,8 +204,10 @@ class DiffusionMonteCarlo:
       self.branch()
       self.count()
       current_step += 1
-    
+      
     self.output()
 
-DMC = DiffusionMonteCarlo(1, 1, steps=2000, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
+# The inital parameters indicated in __init__ are ones the reference suggests but the 
+# below parameters produce a more "stable" energy curve
+DMC = DiffusionMonteCarlo(1, 1, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
 DMC.simulate()
