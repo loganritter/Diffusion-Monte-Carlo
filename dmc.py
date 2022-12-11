@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 
 class DiffusionMonteCarlo:
-  def __init__(self, d, n, steps=2000, N0=500, Nmax=2000, num_buckets=200, x_min=-20.0, x_max=20.0, dt=0.1, alpha=1.0):
+  def __init__(self, d, n, steps=1000, N0=500, Nmax=2000, num_buckets=200, x_min=-20.0, x_max=20.0, dt=0.1, alpha=10.0):
     """
     __init__ initializes base class
 
@@ -16,7 +16,7 @@ class DiffusionMonteCarlo:
     x_min: Lower bound of grid
     x_max: Upper bound of grid
     dt: Time step
-    alpha: Arbitrary positive parameter to update energy
+    alpha: Emperically chosen positive parameter to update energy, based on 1/dt
     """
     self.d = d
     self.n = n
@@ -87,7 +87,7 @@ class DiffusionMonteCarlo:
   def replicateSingleReplica(self, i):
     """
     replicate point i into next available point, update flags by 2 to not loop over new replica
-    i: index of point[i]
+    i: index of points[i]
 
     returns nothing
     """
@@ -119,7 +119,7 @@ class DiffusionMonteCarlo:
           self.replicateSingleReplica(i)
           self.replicateSingleReplica(i)
     
-    for i in range(self.Nmax):
+    for i in range(self.Nmax): # Set previously created replica to "alive"
       if self.flags[i] == 2:
         self.flags[i] = 1
 
@@ -162,8 +162,8 @@ class DiffusionMonteCarlo:
     """
     avg_energy = np.average(np.array(self.energy_storage))
     print("Average Reference Energy: {}".format(avg_energy))
-    print("Analytic Energy:\t\t  0.5") # Exact energy for the 1D ground state harmonic oscillator in dimensionless units
-    print("Percent Difference:\t\t  {:.2f}%".format(np.abs(0.5 - avg_energy)/0.5*100))
+    print("Analytic Energy:          {}".format(0.5)) # Exact energy for the 1D ground state harmonic oscillator in dimensionless units
+    print("Percent Difference:       {:.2f}%".format(np.abs(0.5 - avg_energy)/0.5*100))
 
     ax = plt.gca()
 
@@ -177,7 +177,7 @@ class DiffusionMonteCarlo:
     plt.rcParams.update({'font.size': 14})
 
     plt.title('Reference Energy Per Time Step')
-    plt.xlabel('Time step (dimensionless)')
+    plt.xlabel(r'$\tau$')
     plt.ylabel('<$E_{R}$>')
     x = [i for i in range(len(self.energy_storage))]
     plt.plot(x, self.energy_storage)
@@ -199,15 +199,40 @@ class DiffusionMonteCarlo:
     Do the simulation
     """
     current_step = 0
+    progress = int(self.steps / 10)
     while current_step < self.steps:
+
+      if(current_step == progress):
+        print("[ 10 |", end="", flush=True)
+      elif(current_step == 2*progress):
+        print(" 20 |", end="", flush=True)
+      elif(current_step == 3*progress):
+        print(" 30 |", end="", flush=True)
+      elif(current_step == 4*progress):
+        print(" 40 |", end="", flush=True)
+      elif(current_step == 5*progress):
+        print(" 50 |", end="", flush=True)
+      elif(current_step == 6*progress):
+        print(" 60 |", end="", flush=True)
+      elif(current_step == 7*progress):
+        print(" 70 |", end="", flush=True)
+      elif(current_step == 8*progress):
+        print(" 80 |", end="", flush=True)
+      elif(current_step == 9*progress):
+        print(" 90 |", end="", flush=True)
+      elif(current_step == 10*progress - 1):
+        print(" 100 ]\n", flush=True)
+
       self.walk()
       self.branch()
       self.count()
       current_step += 1
-      
+
+    print("****************************************************")
     self.output()
 
 # The inital parameters indicated in __init__ are ones the reference suggests but the 
-# below parameters produce a more "stable" energy curve
-DMC = DiffusionMonteCarlo(1, 1, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
+# below parameters produce a more "stable" energy curve. Takes ~12 min
+# Curve continues to flatten with increasing replicas (N0, Nmax)
+DMC = DiffusionMonteCarlo(1, 1, steps=2000, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
 DMC.simulate()
