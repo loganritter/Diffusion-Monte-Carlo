@@ -54,8 +54,7 @@ class DiffusionMonteCarlo:
 
     def averagePotentialEnergy(self):
         """
-        Calculate the potential energy (for the entire system/all the replicas)
-        using vectorized NumPy operations.
+        Calculate the potential energy (for the entire system/all the replicas).
 
         Returns:
             float: Average energy of all replicas
@@ -68,7 +67,7 @@ class DiffusionMonteCarlo:
 
     def walk(self):
         """
-        Vectorized walk: moves points around once.
+        walk: moves points around once.
         """
         self.points += np.sqrt(self.dt) * rng.normal(0, 1, size=(self.Nmax, self.dn))
 
