@@ -54,7 +54,8 @@ class DiffusionMonteCarlo:
 
     def averagePotentialEnergy(self):
         """
-        Calculate the potential energy (for the entire system/all the replicas).
+        Calculate the potential energy (for the entire system/all the replicas)
+        using vectorized NumPy operations.
 
         Returns:
             float: Average energy of all replicas
@@ -67,7 +68,7 @@ class DiffusionMonteCarlo:
 
     def walk(self):
         """
-        walk: moves points around once.
+        Vectorized walk: moves points around once.
         """
         self.points += np.sqrt(self.dt) * rng.normal(0, 1, size=(self.Nmax, self.dn))
 
@@ -163,9 +164,13 @@ class DiffusionMonteCarlo:
         returns nothing
         """
         avg_energy = np.average(np.array(self.energy_storage))
-        print("Average Reference Energy: {}".format(avg_energy))
-        print("Analytic Energy:          {}".format(0.5)) # Exact energy for the 1D ground state harmonic oscillator in dimensionless units
-        print("Percent Difference:       {:.2f}%".format(np.abs(0.5 - avg_energy)/0.5*100))
+        
+        # Calculate the analytic energy for the ground state harmonic oscillator
+        analytic_energy = 0.5 * self.n * self.d
+        
+        print("Average Reference Energy: {:.4f}".format(avg_energy))
+        print("Analytic Energy:          {:.4f}".format(analytic_energy))
+        print("Percent Difference:       {:.2f}%".format(np.abs(analytic_energy - avg_energy) / analytic_energy * 100))
 
         ax = plt.gca()
 
@@ -174,13 +179,14 @@ class DiffusionMonteCarlo:
         ax.tick_params(which='both', axis="x", direction="in")
         ax.tick_params(which='both', axis="y", direction="in")
         ax.tick_params(which='both', bottom=True, top=True, left=True, right=True)
-
+        
+        # Plot the reference energy per time step
         plt.rcParams["figure.figsize"] = [10.00, 7.00]
         plt.rcParams.update({'font.size': 14})
 
         plt.title('Reference Energy Per Time Step')
         plt.xlabel(r'$\tau$')
-        plt.ylabel('<$E_{R}$>')
+        plt.ylabel(r'$\langle E_{R} \rangle$')
         x = [i for i in range(len(self.energy_storage))]
         plt.plot(x, self.energy_storage)
         plt.show()
@@ -188,8 +194,9 @@ class DiffusionMonteCarlo:
         count = []
         bins = []
         for i, value in enumerate(self.hist_storage):
-            count.append(self.x_min + (self.x_max - self.x_min) * (i+0.5) / self.num_buckets)
+            count.append(self.x_min + (self.x_max - self.x_min) * (i + 0.5) / self.num_buckets)
             bins.append(value / np.max(self.hist_storage))
+            
         plt.title('Ground State Wavefunction')
         plt.xlabel('x')
         plt.ylabel(r'$\Phi_{0}(x)$')
@@ -220,5 +227,5 @@ class DiffusionMonteCarlo:
 # Curve continues to flatten with increasing replicas (N0, Nmax)
 if __name__ == '__main__':
     rng = np.random.default_rng()
-    DMC = DiffusionMonteCarlo(1, 1, steps=2000, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
+    DMC = DiffusionMonteCarlo(1, 2, steps=2000, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
     DMC.simulate()
