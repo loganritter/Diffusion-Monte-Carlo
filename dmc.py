@@ -222,9 +222,6 @@ class DiffusionMonteCarlo:
         print("****************************************************")
         self.output()
 
-# The inital parameters indicated in __init__ are ones the reference suggests but the 
-# below parameters produce a more "stable" energy curve. Takes ~12 min
-# Curve continues to flatten with increasing replicas (N0, Nmax)
 if __name__ == '__main__':
     rng = np.random.default_rng()
     DMC = DiffusionMonteCarlo(1, 2, steps=2000, dt=0.01, x_min=-5.0, x_max=5.0, N0=10000, Nmax=50000)
