@@ -3,8 +3,10 @@
 #include <cmath>
 #include <random>
 #include <algorithm>
-#include <numeric>  // For std::accumulate
-#include <iterator> // For std::back_inserter
+#include <numeric>
+#include <iterator>
+#include <iomanip>
+#include <chrono>
 
 class DiffusionMonteCarlo {
 public:
@@ -24,16 +26,26 @@ public:
     }
 
     void simulate() {
-        int progress = steps / 10;
-        for (int current_step = 0; current_step < steps; ++current_step) {
-            if (current_step % progress == 0) {
-                std::cout << "[ " << (current_step / steps) * 100 << " |";
-            }
+        int progress_interval = steps / 100;  // Update every 1% of progress
+        auto start_time = std::chrono::high_resolution_clock::now(); // Start timing
 
+        for (int current_step = 0; current_step < steps; ++current_step) {
             walk();
             branch();
             count();
+
+            // Update progress bar
+            if (current_step % progress_interval == 0) {
+                auto current_time = std::chrono::high_resolution_clock::now();
+                double sps = calculateSPS(start_time, current_time, current_step + 1);
+                printProgressBar(current_step, steps, sps);
+            }
         }
+        // Ensure the progress bar shows 100% on completion
+        auto end_time = std::chrono::high_resolution_clock::now();
+        double sps = calculateSPS(start_time, end_time, steps);
+        printProgressBar(steps, steps, sps);
+        std::cout << std::endl;
         output();
     }
 
@@ -55,21 +67,29 @@ private:
     }
 
     double averagePotentialEnergy() {
-        // Average potential energy for all replicas
-        double pot = 0.0;
+        double total_potential = 0.0;
         for (int i = 0; i < Nmax; ++i) {
-            if (flags[i]) {
-                pot += U(points[i]);
+            if (flags[i] == 1) {  // Only consider "alive" replicas
+                total_potential += U(points[i]);
             }
         }
-        return pot / N;
+        return total_potential / N;
     }
 
+
+    const double sqrt_dt = std::sqrt(dt);
     void walk() {
-        // Moves points around
-        for (auto& point : points) {
-            for (auto& p : point) {
-                p += std::sqrt(dt) * normal_dist(generator);
+        std::vector<double> random_numbers(Nmax * dn);
+        for (auto& num : random_numbers) {
+            num = normal_dist(generator);
+        }
+
+        int counter = 0;
+        for (int i = 0; i < Nmax; ++i) {
+            if (flags[i] == 1) {
+                for (auto& p : points[i]) {
+                    p += sqrt_dt * random_numbers[counter++];
+                }
             }
         }
     }
@@ -82,11 +102,11 @@ private:
     }
 
     void replicateSingleReplica(int i) {
-        // Replicate point i into the next available point
+        // Replicate point i into the next available slot only for "alive" replicas
         for (int j = 0; j < Nmax; ++j) {
-            if (flags[j] == 0) {
-                flags[j] = 2;
-                points[j] = points[i];
+            if (flags[j] == 0) {  // Find the first "dead" slot
+                flags[j] = 2;  // Mark as "just created"
+                points[j] = points[i];  // Only consider necessary replicas
                 ++N;
                 break;
             }
@@ -94,51 +114,46 @@ private:
     }
 
     void branch() {
-        // Replicate or remove points as needed
         for (int i = 0; i < Nmax; ++i) {
             if (flags[i] == 1) {
                 int m = calculateM(E2, i);
-
                 if (m == 0) {
-                    flags[i] = 0; // KILL
+                    flags[i] = 0;  // KILL
                     --N;
-                } else if (m == 2) {
-                    replicateSingleReplica(i);
-                } else if (m >= 3) {
-                    replicateSingleReplica(i);
-                    replicateSingleReplica(i);
+                } else {
+                    for (int j = 1; j < m; ++j) {  // Replicate m-1 times if m >= 2
+                        replicateSingleReplica(i);
+                    }
                 }
             }
-        }
-
-        // Set previously created replicas to "alive"
-        for (int i = 0; i < Nmax; ++i) {
+            // Reset "just created" replicas to "alive"
             if (flags[i] == 2) {
                 flags[i] = 1;
             }
         }
 
+        // Update energy after branching
         E1 = E2;
         E2 = E1 + alpha * (1.0 - static_cast<double>(N) / N0);
     }
 
-    int bucketNumber(double x) {
-        // Get the bucket number for x
-        if (x < x_min) {
-            return 0;
-        } else if (x > x_max) {
-            return num_buckets - 1;
-        } else {
-            return static_cast<int>((x - x_min) * num_buckets / (x_max - x_min));
+        int bucketNumber(double x) {
+            // Get the bucket number for x
+            if (x < x_min) {
+                return 0;
+            } else if (x > x_max) {
+                return num_buckets - 1;
+            } else {
+                return static_cast<int>((x - x_min) * num_buckets / (x_max - x_min));
+            }
         }
-    }
 
     void count() {
-        // Count replicas in each bucket
+        // Count replicas in each bucket only for "alive" replicas
         energy_storage.push_back(averagePotentialEnergy());
 
         for (int i = 0; i < Nmax; ++i) {
-            if (flags[i]) {
+            if (flags[i] == 1) {  // Only count "alive" replicas
                 for (double val : points[i]) {
                     hist_storage[bucketNumber(val)]++;
                 }
@@ -156,10 +171,33 @@ private:
         std::cout << "Analytic Energy (Ground State Harmonic Oscillator): " << analytic_energy << std::endl;
         std::cout << "Percent Difference: " << percent_difference << "%" << std::endl;
     }
+    
+    double calculateSPS(const std::chrono::time_point<std::chrono::high_resolution_clock>& start_time,
+                    const std::chrono::time_point<std::chrono::high_resolution_clock>& current_time,
+                    int current_step) {
+        std::chrono::duration<double> elapsed = current_time - start_time;
+        return current_step / elapsed.count();  // Steps per second
+    }
+
+    void printProgressBar(int current_step, int total_steps, double sps) {
+        int barWidth = 50;  // Width of the progress bar
+        double progress = static_cast<double>(current_step) / total_steps;
+
+        std::cout << "\r[";
+        int pos = static_cast<int>(barWidth * progress);
+        for (int i = 0; i < barWidth; ++i) {
+            if (i < pos) std::cout << "=";
+            else if (i == pos) std::cout << ">";
+            else std::cout << " ";
+        }
+        std::cout << "] " << int(progress * 100.0) << " % ";
+        std::cout << std::fixed << std::setprecision(2) << sps << " steps/s";
+        std::cout.flush();
+    }
 };
 
 int main() {
-    DiffusionMonteCarlo DMC(1, 2, 2000, 10000, 50000, 200, -5.0, 5.0, 0.01, 10.0);
+    DiffusionMonteCarlo DMC(1, 1, 2000, 10000, 50000, 200, -5.0, 5.0, 0.01, 10.0);
     DMC.simulate();
     return 0;
 }
